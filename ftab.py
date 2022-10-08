@@ -1,30 +1,23 @@
-import struct
-from binaryninja.binaryview import (
-    BinaryView,
-    BinaryReader,
-)
-from binaryninja.enums import Endianness
+from binaryninja.binaryview import BinaryView
 from binaryninja import mainthread
 from binaryninjaui import UIContext
 from binaryninja import interaction
 
 
-class RKOSView(BinaryView):
-    name = "RKOS"
-    long_name = "RKOS loader"
+class FtabView(BinaryView):
+    name = "Ftab"
+    long_name = "Ftab Loader"
 
     def __init__(self, data):
-        self.reader = BinaryReader(data, Endianness.LittleEndian)
         BinaryView.__init__(self, parent_view=data, file_metadata=data.file)
         self.data = data
 
-    def init(self):
+    def init(self) -> bool:
         tags = self.list_tags()
-
         print(f"Found {len(tags)} tags")
 
         choice = interaction.get_choice_input(
-            "RKOS app", "choices", list(tags.keys())
+            "Ftab modules", "choices", list(tags.keys())
         )
         if choice is not None:
             tag_name = list(tags.keys())[choice]
@@ -37,7 +30,7 @@ class RKOSView(BinaryView):
         return False
 
     @classmethod
-    def is_valid_for_data(self, data):
+    def is_valid_for_data(self, data: BinaryView) -> bool:
         if data.read(0x20, 8) == b"rkosftab":
             return True
         else:
@@ -51,20 +44,21 @@ class RKOSView(BinaryView):
             except UnicodeDecodeError:
                 break
 
-            offset = struct.unpack('<i', self.data.read(i+4, 4))[0]
-            sz = struct.unpack('<i', self.data.read(i+8, 4))[0]
+            offset = self.data.read_int(i + 4, 4)
+            sz = self.data.read_int(i + 8, 4)
             tags[tag] = {'offset': offset, 'size': sz}
-            print(tag, hex(offset), hex(sz))
 
+            print(f"tag : {tag}\n\toffset : {offset:#x}\n\tsize : {sz:#x}")
         return tags
 
-    def extract(self, name, tag):
+    def extract(self, name: str, tag: dict) -> str:
         filename = self.set_output_filename(name)
         open(filename, 'wb').write(self.data.read(tag['offset'], tag['size']))
         return filename
 
-    def set_output_filename(self, out_name) -> str:
+    def set_output_filename(self, out_name: str) -> str:
         """Get the path to save file."""
         filename = self.file.original_filename
         out = filename.replace(filename.split('/')[-1], out_name)
         return out
+
